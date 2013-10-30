@@ -1,5 +1,6 @@
 
 import struct
+import sys
 from itertools import chain
 from collections import namedtuple
 from PIL import Image as PILImage
@@ -48,7 +49,7 @@ class SpritePackage:
 			numAnims    = struct.unpack("<I", file.read(4))[0]
 			
 			for i in range(numTextures):
-				self.textures.append(Texture(file=file, size=self.textureSize, format=self.textureFormat))
+				self.textures.append(Texture(id=i, file=file, size=self.textureSize, format=self.textureFormat))
 			for i in range(numImages):
 				img = Image(file=file)
 				self.images[img.name] = img
@@ -72,10 +73,9 @@ class SpritePackage:
 			i.write(file)
 
 class Texture:
-	def __init__(self, file=None, size=None, format=None):
-		self.isSpecialAI = True
-		self.width = 0
-		self.height = 0
+	def __init__(self, id, file=None, size=None, format=None):
+		self.id = id
+		self.isSpecialAI = False
 		self.contents = None
 		
 		if file is not None:
@@ -226,21 +226,48 @@ class Animation():
 		for i in self.keyframes:
 			file.write(struct.pack("<I", i.delay))
 
-
 def cmd_list(args):
 	package = SpritePackage(file=args.file)
-	print(repr(package))
+	print("Package:")
+	print("\tVersion:", package.version)
+	print("\tTexture Size:", package.textureSize)
+	print("\tTexture Format:", package.textureFormat)
+	for tx in package.textures:
+		print("Texture:")
+		print("\tID:", tx.id)
+		print("\tImage:", tx.contents.mode, tx.contents.size)
+	for name, img in package.images.items():
+		print("Image:")
+		print("\tName:", img.name)
+		print("\tTexture:", img.textureNum)
+		print("\tOffset:", img.offset)
+		print("\tClipped:", img.clipped)
+		print("\tRect:", img.rect)
+		print("\tOriginal Size:", img.originalSize)
+
+def cmd_showtex(args):
+	package = SpritePackage(file=args.file)
+	if args.texid < 0 or args.texid >= len(package.textures):
+		print("Bad texture id", file=sys.stderr)
+		sys.exit(1)
+	
+	package.textures[args.texid].contents.show()
 
 if __name__ == "__main__":
 	import argparse
 	
 	# Argument parsing
-	parser = argparse.ArgumentParser(description="Packs or unpacks a Cobalt .dat file.")
+	parser = argparse.ArgumentParser(description="Utilities for working with Cobalt sprite packages.")
 	subparsers = parser.add_subparsers(dest="command")
 	
-	parser_list = subparsers.add_parser("list")
-	parser_list.add_argument("file", type=argparse.FileType("rb"))
+	# Command: list
+	parser_list = subparsers.add_parser("list", help="Lists the contents of a sprite package")
+	parser_list.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file")
 	
+	# Command: showtex
+	parser_showtex = subparsers.add_parser("showtex", help="Previews a texture.")
+	parser_showtex.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file")
+	parser_showtex.add_argument("texid", type=int, help="Texture ID to show")
 	
 	# Go to commands
 	args = parser.parse_args()
@@ -249,3 +276,7 @@ if __name__ == "__main__":
 		parser.error("Please specify a command")
 	elif args.command == "list":
 		cmd_list(args)
+	elif args.command == "showtex":
+		cmd_showtex(args)
+	else:
+		raise RuntimeError("Unhandled command: "+args.command)
