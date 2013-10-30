@@ -33,7 +33,7 @@ class SpritePackage:
 		self.textures = []
 		self.images = {}
 		self.bundles = {}
-		self.anims = []
+		self.anims = {}
 		
 		if file is not None:
 			self.version       = struct.unpack("<I", file.read(4))[0]
@@ -57,7 +57,8 @@ class SpritePackage:
 				bndl = ImageBundle(file=file)
 				self.bundles[bndl.name] = bndl
 			for i in range(numAnims):
-				self.anims.append(Animation(file=file))
+				anim = Animation(file=file)
+				self.anims[anim.name] = anim
 	
 	def write(file):
 		file.write(struct.pack("<I", self.version))
@@ -125,20 +126,20 @@ class ImageBase:
 			self.name = readStr(file)
 			self.id = struct.unpack("<I", file.read(4))[0]
 			self.offset = (
-				struct.unpack("<I", file.read(4))[0],
-				struct.unpack("<I", file.read(4))[0]
+				struct.unpack("<i", file.read(4))[0],
+				struct.unpack("<i", file.read(4))[0]
 			)
 			self.clipped = (
-				struct.unpack("<I", file.read(4))[0],
-				struct.unpack("<I", file.read(4))[0]
+				struct.unpack("<i", file.read(4))[0],
+				struct.unpack("<i", file.read(4))[0]
 			)
 		
 	def write(file):
 		file.write(self.name.encode("ascii"))
 		file.write(b"\x00")
 		file.write(struct.pack("<I", self.id))
-		file.write(struct.pack("<I", self.offset[0]))
-		file.write(struct.pack("<I", self.offset[1]))
+		file.write(struct.pack("<i", self.offset[0]))
+		file.write(struct.pack("<i", self.offset[1]))
 		file.write(struct.pack("<I", self.clipped[0]))
 		file.write(struct.pack("<I", self.clipped[1]))
 
@@ -206,27 +207,27 @@ class Animation():
 		
 		if file is not None:
 			self.name = readStr(file)
-			numKeyframes = struct.unpack("<I", file.read(4))[0]
+			numKeyframes = struct.unpack("<i", file.read(4))[0]
 			for i in range(numKeyframes):
-				imageId = struct.unpack("<I", file.read(4))[0]
+				imageId = struct.unpack("<i", file.read(4))[0]
 				self.keyframes.append(Keyframe(imageId, None, None))
 			for i in range(numKeyframes):
-				step = struct.unpack("<I", file.read(4))[0]
+				step = struct.unpack("<i", file.read(4))[0]
 				self.keyframes[i].step = step
 			for i in range(numKeyframes):
-				delay = struct.unpack("<I", file.read(4))[0]
+				delay = struct.unpack("<i", file.read(4))[0]
 				self.keyframes[i].delay = delay
 	
 	def write(file):
 		file.write(self.name.encode("ascii"))
 		file.write(b"\x00")
-		file.write(struct.pack("<I", len(self.keyframes)))
+		file.write(struct.pack("<i", len(self.keyframes)))
 		for i in self.keyframes:
-			file.write(struct.pack("<I", i.imageId))
+			file.write(struct.pack("<i", i.imageId))
 		for i in self.keyframes:
-			file.write(struct.pack("<I", i.step))
+			file.write(struct.pack("<i", i.step))
 		for i in self.keyframes:
-			file.write(struct.pack("<I", i.delay))
+			file.write(struct.pack("<i", i.delay))
 
 def cmd_list(args):
 	package = SpritePackage(file=args.file)
@@ -241,6 +242,7 @@ def cmd_list(args):
 	for name, img in package.images.items():
 		print("Image:")
 		print("\tName:", img.name)
+		print("\tID:", img.id)
 		print("\tTexture:", img.textureNum)
 		print("\tRect:", img.rect)
 		print("\tOriginal Size:", img.originalSize)
@@ -248,7 +250,7 @@ def cmd_list(args):
 		print("Bundle:")
 		print("\tName:", bundle.name)
 		print("\tTexture:", bundle.textureNum)
-	for anim in package.anims:
+	for name, anim in package.anims.items():
 		print("Anim:", anim.name)
 
 def cmd_showtex(args):
@@ -266,6 +268,18 @@ def cmd_extracttex(args):
 		sys.exit(1)
 	
 	package.textures[args.texid].contents.save(args.out)
+
+def cmd_showanim(args):
+	package = SpritePackage(file=args.file)
+	if args.anim not in package.anims:
+		print("Bad anim:", args.anim, file=sys.stderr)
+		sys.exit(1)
+	
+	anim = package.anims[args.anim]
+	
+	print("Anim:", anim.name)
+	for i, frame in enumerate(anim.keyframes):
+		print("\t", i, ": ", str(frame), sep="")
 
 if __name__ == "__main__":
 	import argparse
@@ -289,6 +303,11 @@ if __name__ == "__main__":
 	parser_extracttex.add_argument("texid", type=int, help="Texture ID to export.")
 	parser_extracttex.add_argument("out", help="Output file. Image type detected from the extension.")
 	
+	# Command: showanim
+	parser_showanim = subparsers.add_parser("showanim", help="Shows the contents of an animation.")
+	parser_showanim.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file.")
+	parser_showanim.add_argument("anim", help="Animation name")
+	
 	# Go to commands
 	args = parser.parse_args()
 	
@@ -300,5 +319,7 @@ if __name__ == "__main__":
 		cmd_showtex(args)
 	elif args.command == "extracttex":
 		cmd_extracttex(args)
+	elif args.command == "showanim":
+		cmd_showanim(args)
 	else:
 		raise RuntimeError("Unhandled command: "+args.command)
