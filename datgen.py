@@ -2,15 +2,15 @@
 import struct
 from itertools import chain
 from collections import namedtuple
-from PIL import Image
+from PIL import Image as PILImage
 
 def readStr(file):
 	l = []
 	c = file.read(1)
 	while c != b'\x00':
-		l.append(c)
+		l.append(c[0])
 		c = file.read(1)
-	return str(bytes(l), "utf-8")
+	return bytes(l).decode("ascii")
 
 TEXTURE_FORMAT_RGB = 0
 TEXTURE_FORMAT_RGBA = 1
@@ -48,7 +48,7 @@ class SpritePackage:
 			numAnims    = struct.unpack("<I", file.read(4))[0]
 			
 			for i in range(numTextures):
-				self.textures.append(Texture(file=file, size=self.texutreSize, format=self.textureFormat))
+				self.textures.append(Texture(file=file, size=self.textureSize, format=self.textureFormat))
 			for i in range(numImages):
 				img = Image(file=file)
 				self.images[img.name] = img
@@ -87,26 +87,27 @@ class Texture:
 			# Read format and create the image
 			#format = struct.unpack("<I", file.read(1))[0]
 			if format == TEXTURE_FORMAT_RGB:
-				self.contents = Image.new("RGB", (size,size))
+				self.contents = PILImage.new("RGB", (size,size))
 				channels = 3
 				
 			elif format == TEXTURE_FORMAT_RGBA:
-				self.contents = Image.new("RGBA", (size,size))
+				self.contents = PILImage.new("RGBA", (size,size))
 				channels = 4
 				
 			elif format == TEXTURE_FORMAT_A:
-				self.contents = Image.new("L", (size,size))
+				self.contents = PILImage.new("L", (size,size))
 				channels = 1
 				
 			else:
 				raise BadFileFormatError("unknown texture format: "+format)
 			
 			# Read the image contents, arrange them into pixel tuples, and copy it into the image
-			texdata = bytearray(size*size*channels)
+			texdata = []
 			for c in range(channels):
+				texdata.append([])
 				for i in range(size*size):
-					texdata[i*channels+c] = struct.unpack("B", file.read(1))[0]
-			self.contents.putdata(texdata)
+					texdata[c].append(struct.unpack("B", file.read(1))[0])
+			self.contents.putdata(list(zip(*texdata)))
 	
 	def write(file):	
 		for channel in self.contents.split():
@@ -143,7 +144,7 @@ class ImageBase:
 
 class Image(ImageBase):
 	def __init__(self, file=None):
-		super(Image, self).__init__(self, file=file)
+		super(Image, self).__init__(file=file)
 		self.textureNum = 0
 		self.rect = (0,0,1,1) # x,y,w,h
 		self.originalSize = (0,0)
@@ -171,7 +172,7 @@ class Image(ImageBase):
 
 class ImageBundle(ImageBase):
 	def __init__(self, file=None):
-		super(ImageBundle, self).__init__(self)
+		super(ImageBundle, self).__init__(file=file)
 		self.images = []
 		self.widthCount = 1
 		
@@ -226,9 +227,25 @@ class Animation():
 			file.write(struct.pack("<I", i.delay))
 
 
+def cmd_list(args):
+	package = SpritePackage(file=args.file)
+	print(repr(package))
+
 if __name__ == "__main__":
 	import argparse
 	
+	# Argument parsing
+	parser = argparse.ArgumentParser(description="Packs or unpacks a Cobalt .dat file.")
+	subparsers = parser.add_subparsers(dest="command")
+	
+	parser_list = subparsers.add_parser("list")
+	parser_list.add_argument("file", type=argparse.FileType("rb"))
 	
 	
-	pass
+	# Go to commands
+	args = parser.parse_args()
+	
+	if not args.command:
+		parser.error("Please specify a command")
+	elif args.command == "list":
+		cmd_list(args)
