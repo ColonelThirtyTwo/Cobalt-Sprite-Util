@@ -188,17 +188,31 @@ class ImageBundle(ImageBase):
 		for i in self.images:
 			i.write(file)
 
-Keyframe = namedtuple("Keyframe", ("imageId", "step", "delay"))
+class Keyframe:
+	def __init__(self, imageId, step, delay):
+		self.imageId = imageId
+		self.step = step
+		self.delay = delay
 
 class Animation():
 	
 	def __init__(self, file=None):
 		self.name = ""
 		self.keyframes = []
-		#self.imageIds = []
-		#self.steps = []
-		#self.delays = []
 		self.associatedTexture = -1
+		
+		if file is not None:
+			self.name = readStr(file)
+			numKeyframes = struct.unpack("<I", file.read(4))
+			for i in range(numKeyframes):
+				imageId = struct.unpack("<I", file.read(4))
+				self.keyframes.append(Keyframe(imageId, None, None))
+			for i in range(numKeyframes):
+				step = struct.unpack("<I", file.read(4))
+				self.keyframes[i].step = step
+			for i in range(numKeyframes):
+				delay = struct.unpack("<I", file.read(4))
+				self.keyframes[i].delay = delay
 	
 	def write(file):
 		file.write(self.name.encode("ascii"))
