@@ -253,6 +253,14 @@ def cmd_showtex(args):
 	
 	package.textures[args.texid].contents.show()
 
+def cmd_extracttex(args):
+	package = SpritePackage(file=args.file)
+	if args.texid < 0 or args.texid >= len(package.textures):
+		print("Bad texture id", file=sys.stderr)
+		sys.exit(1)
+	
+	package.textures[args.texid].contents.save(args.out)
+
 if __name__ == "__main__":
 	import argparse
 	
@@ -261,13 +269,19 @@ if __name__ == "__main__":
 	subparsers = parser.add_subparsers(dest="command")
 	
 	# Command: list
-	parser_list = subparsers.add_parser("list", help="Lists the contents of a sprite package")
-	parser_list.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file")
+	parser_list = subparsers.add_parser("list", help="Lists the contents of a sprite package.")
+	parser_list.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file.")
 	
 	# Command: showtex
 	parser_showtex = subparsers.add_parser("showtex", help="Previews a texture.")
-	parser_showtex.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file")
-	parser_showtex.add_argument("texid", type=int, help="Texture ID to show")
+	parser_showtex.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file.")
+	parser_showtex.add_argument("texid", type=int, help="Texture ID to show.")
+	
+	# Command: extracttex
+	parser_extracttex = subparsers.add_parser("extracttex", help="Exports a texture as an image file.")
+	parser_extracttex.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file.")
+	parser_extracttex.add_argument("texid", type=int, help="Texture ID to export.")
+	parser_extracttex.add_argument("out", help="Output file. Image type detected from the extension.")
 	
 	# Go to commands
 	args = parser.parse_args()
@@ -278,5 +292,7 @@ if __name__ == "__main__":
 		cmd_list(args)
 	elif args.command == "showtex":
 		cmd_showtex(args)
+	elif args.command == "extracttex":
+		cmd_extracttex(args)
 	else:
 		raise RuntimeError("Unhandled command: "+args.command)
