@@ -35,17 +35,17 @@ class SpritePackage:
 		self.anims = []
 		
 		if file is not None:
-			self.version       = struct.unpack("<I", file.read(4))
+			self.version       = struct.unpack("<I", file.read(4))[0]
 			if self.version != 3:
 				raise BadFileFormatError("Unsupported version: "+self.version)
 			
-			self.textureSize   = struct.unpack("<I", file.read(4))
-			self.textureFormat = struct.unpack("<I", file.read(4))
+			self.textureSize   = struct.unpack("<I", file.read(4))[0]
+			self.textureFormat = struct.unpack("<I", file.read(4))[0]
 			
-			numTextures = struct.unpack("<I", file.read(4))
-			numImages   = struct.unpack("<I", file.read(4))
-			numBundles  = struct.unpack("<I", file.read(4))
-			numAnims    = struct.unpack("<I", file.read(4))
+			numTextures = struct.unpack("<I", file.read(4))[0]
+			numImages   = struct.unpack("<I", file.read(4))[0]
+			numBundles  = struct.unpack("<I", file.read(4))[0]
+			numAnims    = struct.unpack("<I", file.read(4))[0]
 			
 			for i in range(numTextures):
 				self.textures.append(Texture(file=file, size=self.texutreSize, format=self.textureFormat))
@@ -85,7 +85,7 @@ class Texture:
 				raise ValueError("format must not be none")
 			
 			# Read format and create the image
-			#format = struct.unpack("<I", file.read(1))
+			#format = struct.unpack("<I", file.read(1))[0]
 			if format == TEXTURE_FORMAT_RGB:
 				self.contents = Image.new("RGB", (size,size))
 				channels = 3
@@ -105,7 +105,7 @@ class Texture:
 			texdata = bytearray(size*size*channels)
 			for c in range(channels):
 				for i in range(size*size):
-					texdata[i*channels+c] = struct.unpack("B", file.read(1))
+					texdata[i*channels+c] = struct.unpack("B", file.read(1))[0]
 			self.contents.putdata(texdata)
 	
 	def write(file):	
@@ -122,14 +122,14 @@ class ImageBase:
 		
 		if file is not None:
 			self.name = readStr(file)
-			self.id = struct.unpack("<I", file.read(4))
+			self.id = struct.unpack("<I", file.read(4))[0]
 			self.offset = (
-				struct.unpack("<I", file.read(4)),
-				struct.unpack("<I", file.read(4))
+				struct.unpack("<I", file.read(4))[0],
+				struct.unpack("<I", file.read(4))[0]
 			)
 			self.clipped = (
-				struct.unpack("<I", file.read(4)),
-				struct.unpack("<I", file.read(4))
+				struct.unpack("<I", file.read(4))[0],
+				struct.unpack("<I", file.read(4))[0]
 			)
 		
 	def write(file):
@@ -149,16 +149,16 @@ class Image(ImageBase):
 		self.originalSize = (0,0)
 		
 		if file is not None:
-			self.textureNum = struct.unpack("<I", file.read(4))
+			self.textureNum = struct.unpack("<I", file.read(4))[0]
 			self.rect = (
-				struct.unpack("<I", file.read(4)),
-				struct.unpack("<I", file.read(4)),
-				struct.unpack("<I", file.read(4)),
-				struct.unpack("<I", file.read(4))
+				struct.unpack("<I", file.read(4))[0],
+				struct.unpack("<I", file.read(4))[0],
+				struct.unpack("<I", file.read(4))[0],
+				struct.unpack("<I", file.read(4))[0]
 			)
 			self.originalSize = (
-				struct.unpack("<I", file.read(4)),
-				struct.unpack("<I", file.read(4))
+				struct.unpack("<I", file.read(4))[0],
+				struct.unpack("<I", file.read(4))[0]
 			)
 	
 	def write(file):
@@ -176,8 +176,8 @@ class ImageBundle(ImageBase):
 		self.widthCount = 1
 		
 		if file is not None:
-			self.widthCount = struct.unpack("<I", file.read(4))
-			numImages = struct.unpack("<I", file.read(4))
+			self.widthCount = struct.unpack("<I", file.read(4))[0]
+			numImages = struct.unpack("<I", file.read(4))[0]
 			for i in range(numImages):
 				self.images.append(Image(file=file))
 	
@@ -203,15 +203,15 @@ class Animation():
 		
 		if file is not None:
 			self.name = readStr(file)
-			numKeyframes = struct.unpack("<I", file.read(4))
+			numKeyframes = struct.unpack("<I", file.read(4))[0]
 			for i in range(numKeyframes):
-				imageId = struct.unpack("<I", file.read(4))
+				imageId = struct.unpack("<I", file.read(4))[0]
 				self.keyframes.append(Keyframe(imageId, None, None))
 			for i in range(numKeyframes):
-				step = struct.unpack("<I", file.read(4))
+				step = struct.unpack("<I", file.read(4))[0]
 				self.keyframes[i].step = step
 			for i in range(numKeyframes):
-				delay = struct.unpack("<I", file.read(4))
+				delay = struct.unpack("<I", file.read(4))[0]
 				self.keyframes[i].delay = delay
 	
 	def write(file):
