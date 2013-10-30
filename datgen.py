@@ -194,13 +194,15 @@ class Keyframe:
 		self.imageId = imageId
 		self.step = step
 		self.delay = delay
+	
+	def __str__(self):
+		return "(Image: {0}, Step: {1}, Delay: {2})".format(self.imageId, self.step, self.delay)
 
 class Animation():
 	
 	def __init__(self, file=None):
 		self.name = ""
 		self.keyframes = []
-		self.associatedTexture = -1
 		
 		if file is not None:
 			self.name = readStr(file)
@@ -240,10 +242,14 @@ def cmd_list(args):
 		print("Image:")
 		print("\tName:", img.name)
 		print("\tTexture:", img.textureNum)
-		print("\tOffset:", img.offset)
-		print("\tClipped:", img.clipped)
 		print("\tRect:", img.rect)
 		print("\tOriginal Size:", img.originalSize)
+	for name, bundle in package.bundles.items():
+		print("Bundle:")
+		print("\tName:", bundle.name)
+		print("\tTexture:", bundle.textureNum)
+	for anim in package.anims:
+		print("Anim:", anim.name)
 
 def cmd_showtex(args):
 	package = SpritePackage(file=args.file)
