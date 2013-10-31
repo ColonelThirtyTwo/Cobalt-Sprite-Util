@@ -60,7 +60,7 @@ class SpritePackage:
 				anim = Animation(file=file)
 				self.anims[anim.name] = anim
 	
-	def write(file):
+	def write(self, file):
 		file.write(struct.pack("<I", self.version))
 		file.write(struct.pack("<I", self.textureSize))
 		file.write(struct.pack("<I", self.textureFormat))
@@ -70,7 +70,14 @@ class SpritePackage:
 		file.write(struct.pack("<I", len(self.bundles)))
 		file.write(struct.pack("<I", len(self.anims)))
 		
-		for i in chain(self.textures, self.images, self.bundles, self.anims):
+		
+		for i in self.textures:
+			i.write(file)
+		for i in sorted(self.images.values(), key=lambda x: x.id):
+			i.write(file)
+		for i in sorted(self.bundles.values(), key=lambda x: x.id):
+			i.write(file)
+		for i in sorted(self.anims.values(), key=lambda x: x.name):
 			i.write(file)
 
 class Texture:
@@ -110,9 +117,9 @@ class Texture:
 			texdata = bytes(texdata)
 			self.contents = PILImage.frombytes(mode, (size,size), texdata)
 			
-	def write(file):	
+	def write(self, file):	
 		for channel in self.contents.split():
-			for px in channel:
+			for px in channel.getdata():
 				file.write(struct.pack("B", px))
 
 class ImageBase:
@@ -134,7 +141,7 @@ class ImageBase:
 				struct.unpack("<i", file.read(4))[0]
 			)
 		
-	def write(file):
+	def write(self, file):
 		file.write(self.name.encode("ascii"))
 		file.write(b"\x00")
 		file.write(struct.pack("<I", self.id))
@@ -163,7 +170,7 @@ class Image(ImageBase):
 				struct.unpack("<I", file.read(4))[0]
 			)
 	
-	def write(file):
+	def write(self, file):
 		super(Image, self).write(file)
 		file.write(struct.pack("<I", self.textureNum))
 		for n in self.rect:
@@ -183,7 +190,7 @@ class ImageBundle(ImageBase):
 			for i in range(numImages):
 				self.images.append(Image(file=file))
 	
-	def write(file):
+	def write(self, file):
 		super(Image, self).write(file)
 		file.write(struct.pack("<I", self.width))
 		file.write(struct.pack("<I", len(self.images)))
@@ -218,7 +225,7 @@ class Animation():
 				delay = struct.unpack("<i", file.read(4))[0]
 				self.keyframes[i].delay = delay
 	
-	def write(file):
+	def write(self, file):
 		file.write(self.name.encode("ascii"))
 		file.write(b"\x00")
 		file.write(struct.pack("<i", len(self.keyframes)))
@@ -285,6 +292,63 @@ def cmd_showanim(args):
 	for i, frame in enumerate(anim.keyframes):
 		print("\t", i, ": ", str(frame), sep="")
 
+def cmd_sspack(args):	
+	import re
+	linere = re.compile(r"^([^\s]+)\s*=\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*$")
+	
+	package = SpritePackage()
+	
+	pilimg = PILImage.open(args.txfile)
+	
+	if pilimg.size[0] != pilimg.size[1] or ((pilimg.size[0] & (pilimg.size[0]-1)) != 0):
+		print("Image must be square with powers of two dimensions", file=sys.stderr)
+		sys.exit(1)
+	
+	package.textureSize = pilimg.size[0]
+	
+	tex = Texture(0)
+	tex.contents = pilimg
+	
+	if pilimg.mode == "RGB":
+		package.textureFormat = TEXTURE_FORMAT_RGB
+	elif pilimg.mode == "RGBA":
+		package.textureFormat = TEXTURE_FORMAT_RGBA
+	elif pilimg.mode == "L":
+		package.textureFormat = TEXTURE_FORMAT_A
+	else:
+		print("Incompatible image mode: "+img.mode, file=sys.stderr)
+		sys.exit(1)
+	
+	package.textures.append(tex)
+	
+	with args.listfile:
+		for i, line in enumerate(args.listfile):
+			if line.strip() == "":
+				continue
+			
+			match = linere.match(line)
+			if not match:
+				print("Bad input line: '{0}'".format(line), file=sys.stderr)
+				sys.exit(1)
+			
+			name, x, y, w, h = match.groups()
+			x, y, w, h = int(x), int(y), int(w), int(h)
+			
+			img = Image()
+			img.name = name
+			img.id = i
+			img.rect = (x,y,w,h)
+			img.originalSize = (w,h)
+			package.images[img.name] = img
+			
+			anim = Animation()
+			anim.name = name
+			anim.keyframes.append(Keyframe(img.id, 1, -1))
+			package.anims[anim.name] = anim
+	
+	with args.out:
+		package.write(args.out)	
+
 if __name__ == "__main__":
 	import argparse
 	
@@ -312,6 +376,12 @@ if __name__ == "__main__":
 	parser_showanim.add_argument("file", type=argparse.FileType("rb"), help="Sprite package file.")
 	parser_showanim.add_argument("anim", help="Animation name")
 	
+	# Command: sspack
+	parser_sspack = subparsers.add_parser("sspack", help="Creates a simple sprite package from a Spritesheet Packer file.")
+	parser_sspack.add_argument("txfile", help="Input texture file.")
+	parser_sspack.add_argument("listfile", type=argparse.FileType("r"), help="Input list file. Contains lines in the format 'name = x y w h'.")
+	parser_sspack.add_argument("out", type=argparse.FileType("wb"), help="Sprite package file.")	
+	
 	# Go to commands
 	args = parser.parse_args()
 	
@@ -325,5 +395,7 @@ if __name__ == "__main__":
 		cmd_extracttex(args)
 	elif args.command == "showanim":
 		cmd_showanim(args)
+	elif args.command == "sspack":
+		cmd_sspack(args)
 	else:
 		raise RuntimeError("Unhandled command: "+args.command)
