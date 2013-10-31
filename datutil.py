@@ -88,28 +88,28 @@ class Texture:
 			# Read format and create the image
 			#format = struct.unpack("<I", file.read(1))[0]
 			if format == TEXTURE_FORMAT_RGB:
-				self.contents = PILImage.new("RGB", (size,size))
+				mode = "RGB"
 				channels = 3
 				
 			elif format == TEXTURE_FORMAT_RGBA:
-				self.contents = PILImage.new("RGBA", (size,size))
+				mode = "RGBA"
 				channels = 4
 				
 			elif format == TEXTURE_FORMAT_A:
-				self.contents = PILImage.new("L", (size,size))
+				mode = "L"
 				channels = 1
 				
 			else:
 				raise BadFileFormatError("unknown texture format: "+format)
 			
-			# Read the image contents, arrange them into pixel tuples, and copy it into the image
-			texdata = []
+			# Read the image contents
+			texdata = bytearray(size*size*channels)
 			for c in range(channels):
-				texdata.append([])
 				for i in range(size*size):
-					texdata[c].append(struct.unpack("B", file.read(1))[0])
-			self.contents.putdata(list(zip(*texdata)))
-	
+					texdata[i*channels+c] = file.read(1)[0]
+			texdata = bytes(texdata)
+			self.contents = PILImage.frombytes(mode, (size,size), texdata)
+			
 	def write(file):	
 		for channel in self.contents.split():
 			for px in channel:
@@ -240,9 +240,10 @@ def cmd_list(args):
 		print("\tID:", tx.id)
 		print("\tImage:", tx.contents.mode, tx.contents.size)
 	for name, img in package.images.items():
-		print("Image:")
-		print("\tName:", img.name)
+		print("Image:", img.name)
 		print("\tID:", img.id)
+		print("\tOffset:", img.offset)
+		print("\tClip:", img.clipped)
 		print("\tTexture:", img.textureNum)
 		print("\tRect:", img.rect)
 		print("\tOriginal Size:", img.originalSize)
@@ -254,7 +255,8 @@ def cmd_list(args):
 		print("Anim:", anim.name)
 
 def cmd_showtex(args):
-	package = SpritePackage(file=args.file)
+	with args.file:
+		package = SpritePackage(file=args.file)
 	if args.texid < 0 or args.texid >= len(package.textures):
 		print("Bad texture id", file=sys.stderr)
 		sys.exit(1)
@@ -262,7 +264,8 @@ def cmd_showtex(args):
 	package.textures[args.texid].contents.show()
 
 def cmd_extracttex(args):
-	package = SpritePackage(file=args.file)
+	with args.file:
+		package = SpritePackage(file=args.file)
 	if args.texid < 0 or args.texid >= len(package.textures):
 		print("Bad texture id", file=sys.stderr)
 		sys.exit(1)
@@ -270,7 +273,8 @@ def cmd_extracttex(args):
 	package.textures[args.texid].contents.save(args.out)
 
 def cmd_showanim(args):
-	package = SpritePackage(file=args.file)
+	with args.file:
+		package = SpritePackage(file=args.file)
 	if args.anim not in package.anims:
 		print("Bad anim:", args.anim, file=sys.stderr)
 		sys.exit(1)
