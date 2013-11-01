@@ -38,7 +38,7 @@ class SpritePackage:
 	* image bundles, which are collections of images, and
 	* animations
 	"""
-	def __init__(self, file=None):
+	def __init__(self):
 		self.version = 3
 		self.textureSize = 0
 		self.textureFormat = 0
@@ -47,31 +47,34 @@ class SpritePackage:
 		self.images = {}
 		self.bundles = {}
 		self.anims = {}
+	
+	@classmethod
+	def read(cls, file):
+		self = cls()
+		version = struct.unpack("<I", file.read(4))[0]
+		if version != 3:
+			raise BadFileFormatError("Unsupported version: "+version)
 		
-		if file is not None:
-			self.version       = struct.unpack("<I", file.read(4))[0]
-			if self.version != 3:
-				raise BadFileFormatError("Unsupported version: "+self.version)
-			
-			self.textureSize   = struct.unpack("<I", file.read(4))[0]
-			self.textureFormat = struct.unpack("<I", file.read(4))[0]
-			
-			numTextures = struct.unpack("<I", file.read(4))[0]
-			numImages   = struct.unpack("<I", file.read(4))[0]
-			numBundles  = struct.unpack("<I", file.read(4))[0]
-			numAnims    = struct.unpack("<I", file.read(4))[0]
-			
-			for i in range(numTextures):
-				self.textures.append(Texture(id=i, file=file, size=self.textureSize, format=self.textureFormat))
-			for i in range(numImages):
-				img = Image(file=file)
-				self.images[img.name] = img
-			for i in range(numBundles):
-				bndl = ImageBundle(file=file)
-				self.bundles[bndl.name] = bndl
-			for i in range(numAnims):
-				anim = Animation(file=file)
-				self.anims[anim.name] = anim
+		self.textureSize   = struct.unpack("<I", file.read(4))[0]
+		self.textureFormat = struct.unpack("<I", file.read(4))[0]
+		
+		numTextures = struct.unpack("<I", file.read(4))[0]
+		numImages   = struct.unpack("<I", file.read(4))[0]
+		numBundles  = struct.unpack("<I", file.read(4))[0]
+		numAnims    = struct.unpack("<I", file.read(4))[0]
+		
+		for i in range(numTextures):
+			self.textures.append(Texture.read(file, i, self.textureSize, self.textureFormat))
+		for i in range(numImages):
+			img = Image.read(file)
+			self.images[img.name] = img
+		for i in range(numBundles):
+			bndl = ImageBundle.read(file)
+			self.bundles[bndl.name] = bndl
+		for i in range(numAnims):
+			anim = Animation.read(file)
+			self.anims[anim.name] = anim
+		return self
 	
 	def write(self, file):
 		file.write(struct.pack("<I", self.version))
@@ -82,7 +85,6 @@ class SpritePackage:
 		file.write(struct.pack("<I", len(self.images)))
 		file.write(struct.pack("<I", len(self.bundles)))
 		file.write(struct.pack("<I", len(self.anims)))
-		
 		
 		for i in self.textures:
 			i.write(file)
@@ -102,42 +104,40 @@ class Texture:
 	
 	Textures can be RGB, RGBA, A, or "Special AI" (not supported yet)
 	"""
-	def __init__(self, id, file=None, size=None, format=None):
-		self.id = id
+	def __init__(self):
+		self.id = 0
 		self.isSpecialAI = False
 		self.contents = None
+	
+	@classmethod
+	def read(cls, file, id, size, format):
+		self = cls()
+		self.id = id
 		
-		if file is not None:
-			if size is None:
-				raise ValueError("size must not be none")
-			if format is None:
-				raise ValueError("format must not be none")
+		if format == TEXTURE_FORMAT_RGB:
+			mode = "RGB"
+			channels = 3
 			
-			# Read format and create the image
-			#format = struct.unpack("<I", file.read(1))[0]
-			if format == TEXTURE_FORMAT_RGB:
-				mode = "RGB"
-				channels = 3
-				
-			elif format == TEXTURE_FORMAT_RGBA:
-				mode = "RGBA"
-				channels = 4
-				
-			elif format == TEXTURE_FORMAT_A:
-				mode = "L"
-				channels = 1
-				
-			else:
-				raise BadFileFormatError("unknown texture format: "+format)
+		elif format == TEXTURE_FORMAT_RGBA:
+			mode = "RGBA"
+			channels = 4
 			
-			# Read the image contents
-			texdata = bytearray(size*size*channels)
-			for c in range(channels):
-				for i in range(size*size):
-					texdata[i*channels+c] = file.read(1)[0]
-			texdata = bytes(texdata)
-			self.contents = PILImage.frombytes(mode, (size,size), texdata)
+		elif format == TEXTURE_FORMAT_A:
+			mode = "L"
+			channels = 1
 			
+		else:
+			raise BadFileFormatError("unknown texture format: "+format)
+		
+		# Read the image contents
+		texdata = bytearray(size*size*channels)
+		for c in range(channels):
+			for i in range(size*size):
+				texdata[i*channels+c] = file.read(1)[0]
+		texdata = bytes(texdata)
+		self.contents = PILImage.frombytes(mode, (size,size), texdata)
+		return self
+	
 	def write(self, file):	
 		for channel in self.contents.split():
 			for px in channel.getdata():
@@ -147,24 +147,27 @@ class ImageBase:
 	"""
 	Base class for images. Do not use this directly!
 	"""
-	def __init__(self, file=None):
+	def __init__(self):
 		self.name = ""
 		self.id = 0
 		self.offset = (0,0)
 		self.clipped = (0,0)
-		
-		if file is not None:
-			self.name = readStr(file)
-			self.id = struct.unpack("<I", file.read(4))[0]
-			self.offset = (
-				struct.unpack("<i", file.read(4))[0],
-				struct.unpack("<i", file.read(4))[0]
-			)
-			self.clipped = (
-				struct.unpack("<i", file.read(4))[0],
-				struct.unpack("<i", file.read(4))[0]
-			)
-		
+	
+	@classmethod
+	def read(cls, file):
+		self = cls()
+		self.name = readStr(file)
+		self.id = struct.unpack("<I", file.read(4))[0]
+		self.offset = (
+			struct.unpack("<i", file.read(4))[0],
+			struct.unpack("<i", file.read(4))[0]
+		)
+		self.clipped = (
+			struct.unpack("<i", file.read(4))[0],
+			struct.unpack("<i", file.read(4))[0]
+		)
+		return self
+	
 	def write(self, file):
 		file.write(self.name.encode("ascii"))
 		file.write(b"\x00")
@@ -178,24 +181,27 @@ class Image(ImageBase):
 	"""
 	Defines a single sprite in a textures.
 	"""
-	def __init__(self, file=None):
-		super(Image, self).__init__(file=file)
+	def __init__(self):
+		super(Image, self).__init__()
 		self.textureNum = 0
 		self.rect = (0,0,1,1) # x,y,w,h
 		self.originalSize = (0,0)
 		
-		if file is not None:
-			self.textureNum = struct.unpack("<I", file.read(4))[0]
-			self.rect = (
-				struct.unpack("<I", file.read(4))[0],
-				struct.unpack("<I", file.read(4))[0],
-				struct.unpack("<I", file.read(4))[0],
-				struct.unpack("<I", file.read(4))[0]
-			)
-			self.originalSize = (
-				struct.unpack("<I", file.read(4))[0],
-				struct.unpack("<I", file.read(4))[0]
-			)
+	@classmethod
+	def read(cls, file):
+		self = super().read(file)
+		self.textureNum = struct.unpack("<I", file.read(4))[0]
+		self.rect = (
+			struct.unpack("<I", file.read(4))[0],
+			struct.unpack("<I", file.read(4))[0],
+			struct.unpack("<I", file.read(4))[0],
+			struct.unpack("<I", file.read(4))[0]
+		)
+		self.originalSize = (
+			struct.unpack("<I", file.read(4))[0],
+			struct.unpack("<I", file.read(4))[0]
+		)
+		return self
 	
 	def write(self, file):
 		super(Image, self).write(file)
@@ -210,16 +216,19 @@ class ImageBundle(ImageBase):
 	Defines a collection of images.
 	This doesn't seem to be used much, and has not been thoroughly tested.
 	"""
-	def __init__(self, file=None):
-		super(ImageBundle, self).__init__(file=file)
+	def __init__(self):
+		super(ImageBundle, self).__init__()
 		self.images = []
 		self.widthCount = 1
-		
-		if file is not None:
-			self.widthCount = struct.unpack("<I", file.read(4))[0]
-			numImages = struct.unpack("<I", file.read(4))[0]
-			for i in range(numImages):
-				self.images.append(Image(file=file))
+	
+	@classmethod
+	def read(cls, file):
+		self = super().read(file)
+		self.widthCount = struct.unpack("<I", file.read(4))[0]
+		numImages = struct.unpack("<I", file.read(4))[0]
+		for i in range(numImages):
+			self.images.append(Image(file=file))
+		return self
 	
 	def write(self, file):
 		super(Image, self).write(file)
@@ -246,22 +255,25 @@ class Animation:
 	
 	Most sprites have a single, static animation with one frame.
 	"""
-	def __init__(self, file=None):
+	def __init__(self):
 		self.name = ""
 		self.keyframes = []
-		
-		if file is not None:
-			self.name = readStr(file)
-			numKeyframes = struct.unpack("<i", file.read(4))[0]
-			for i in range(numKeyframes):
-				imageId = struct.unpack("<i", file.read(4))[0]
-				self.keyframes.append(Keyframe(imageId, None, None))
-			for i in range(numKeyframes):
-				step = struct.unpack("<i", file.read(4))[0]
-				self.keyframes[i].step = step
-			for i in range(numKeyframes):
-				delay = struct.unpack("<i", file.read(4))[0]
-				self.keyframes[i].delay = delay
+	
+	@classmethod
+	def read(cls, file):
+		self = cls()
+		self.name = readStr(file)
+		numKeyframes = struct.unpack("<i", file.read(4))[0]
+		for i in range(numKeyframes):
+			imageId = struct.unpack("<i", file.read(4))[0]
+			self.keyframes.append(Keyframe(imageId, None, None))
+		for i in range(numKeyframes):
+			step = struct.unpack("<i", file.read(4))[0]
+			self.keyframes[i].step = step
+		for i in range(numKeyframes):
+			delay = struct.unpack("<i", file.read(4))[0]
+			self.keyframes[i].delay = delay
+		return self
 	
 	def write(self, file):
 		file.write(self.name.encode("ascii"))

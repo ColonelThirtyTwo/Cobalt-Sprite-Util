@@ -3,7 +3,7 @@ import sys
 from spritepackage import *
 
 def cmd_list(args):
-	package = SpritePackage(file=args.file)
+	package = SpritePackage.read(args.file)
 	print("Package:")
 	print("\tVersion:", package.version)
 	print("\tTexture Size:", package.textureSize)
@@ -29,7 +29,7 @@ def cmd_list(args):
 
 def cmd_showtex(args):
 	with args.file:
-		package = SpritePackage(file=args.file)
+		package = SpritePackage.read(args.file)
 	if args.texid < 0 or args.texid >= len(package.textures):
 		print("Bad texture id", file=sys.stderr)
 		sys.exit(1)
@@ -38,7 +38,7 @@ def cmd_showtex(args):
 
 def cmd_extracttex(args):
 	with args.file:
-		package = SpritePackage(file=args.file)
+		package = SpritePackage.read(args.file)
 	if args.texid < 0 or args.texid >= len(package.textures):
 		print("Bad texture id", file=sys.stderr)
 		sys.exit(1)
@@ -47,7 +47,7 @@ def cmd_extracttex(args):
 
 def cmd_showanim(args):
 	with args.file:
-		package = SpritePackage(file=args.file)
+		package = SpritePackage.read(args.file)
 	if args.anim not in package.anims:
 		print("Bad anim:", args.anim, file=sys.stderr)
 		sys.exit(1)
@@ -72,7 +72,8 @@ def cmd_sspack(args):
 	
 	package.textureSize = pilimg.size[0]
 	
-	tex = Texture(0)
+	tex = Texture()
+	tex.id = 0
 	tex.contents = pilimg
 	
 	if pilimg.mode == "RGB":
