@@ -144,9 +144,7 @@ class SSPackCommand(BaseCommand):
 		
 		package.textureSize = pilimg.size[0]
 		
-		tex = Texture()
-		tex.id = 0
-		tex.contents = pilimg
+		tex = Texture(0, pilimg)
 		
 		if pilimg.mode == "RGB":
 			package.textureFormat = TEXTURE_FORMAT_RGB
@@ -173,15 +171,10 @@ class SSPackCommand(BaseCommand):
 				name, x, y, w, h = match.groups()
 				x, y, w, h = int(x), int(y), int(w), int(h)
 				
-				img = Image()
-				img.name = name
-				img.id = i
-				img.rect = (x,y,w,h)
-				img.originalSize = (w,h)
+				img = Image(i, name, 0, (x,y,w,h))
 				package.images[img.name] = img
 				
-				anim = Animation()
-				anim.name = name
+				anim = Animation(name)
 				anim.keyframes.append(Keyframe(img.id, 1, -1))
 				package.anims[anim.name] = anim
 		

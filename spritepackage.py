@@ -18,6 +18,16 @@ TEXTURE_FORMAT_RGBA = 1
 TEXTURE_FORMAT_A = 2
 TEXTURE_FORMAT_SPECIAL_AI = 3
 
+mode2format = {
+	"RGB": TEXTURE_FORMAT_RGB,
+	"RGBA": TEXTURE_FORMAT_RGBA,
+	"L": TEXTURE_FORMAT_A,
+	
+	TEXTURE_FORMAT_RGB: "RGB",
+	TEXTURE_FORMAT_RGBA: "RGBA",
+	TEXTURE_FORMAT_A: "L",
+}
+
 BASE_ID_IMAGES = 0
 BASE_ID_BUNDLES = 100000
 
@@ -87,6 +97,10 @@ class SpritePackage:
 		file.write(struct.pack("<I", len(self.anims)))
 		
 		for i in self.textures:
+			assert i.contents.size[0] == i.contents.size[1]
+			assert i.contents.size[0] == self.textureSize
+			assert mode2format[i.contents.mode] == self.textureFormat
+			
 			i.write(file)
 		for i in sorted(self.images.values(), key=lambda x: x.id):
 			i.write(file)
@@ -104,14 +118,14 @@ class Texture:
 	
 	Textures can be RGB, RGBA, A, or "Special AI" (not supported yet)
 	"""
-	def __init__(self):
-		self.id = 0
+	def __init__(self, id, img):
+		self.id = id
 		self.isSpecialAI = False
-		self.contents = None
+		self.contents = img
 	
 	@classmethod
 	def read(cls, file, id, size, format):
-		self = cls()
+		self = cls.__new__(cls)
 		self.id = id
 		
 		if format == TEXTURE_FORMAT_RGB:
@@ -147,15 +161,15 @@ class ImageBase:
 	"""
 	Base class for images. Do not use this directly!
 	"""
-	def __init__(self):
-		self.name = ""
-		self.id = 0
-		self.offset = (0,0)
-		self.clipped = (0,0)
+	def __init__(self, id, name, offset=None, clipped=None):
+		self.name = name
+		self.id = id
+		self.offset = offset or (0,0)
+		self.clipped = clipped or (0,0)
 	
 	@classmethod
 	def read(cls, file):
-		self = cls()
+		self = cls.__new__(cls)
 		self.name = readStr(file)
 		self.id = struct.unpack("<I", file.read(4))[0]
 		self.offset = (
@@ -181,11 +195,17 @@ class Image(ImageBase):
 	"""
 	Defines a single sprite in a textures.
 	"""
-	def __init__(self):
-		super(Image, self).__init__()
-		self.textureNum = 0
-		self.rect = (0,0,1,1) # x,y,w,h
-		self.originalSize = (0,0)
+	def __init__(self, id, name, textureId, rect, originalSize=None, offset=None, clipped=None):
+		"""
+		Creates a new image
+		"""
+		super(Image, self).__init__(id, name, offset, clipped)
+		self.textureNum = textureId
+		self.rect = rect # x,y,w,h
+		if originalSize:
+			self.originalSize = originalSize
+		else:
+			self.originalSize = rect[2:4]
 		
 	@classmethod
 	def read(cls, file):
@@ -214,17 +234,19 @@ class Image(ImageBase):
 class ImageBundle(ImageBase):
 	"""
 	Defines a collection of images.
-	This doesn't seem to be used much, and has not been thoroughly tested.
+	This doesn't seem to be used much, and has not been thoroughly tested or understood.
 	"""
-	def __init__(self):
-		super(ImageBundle, self).__init__()
+	def __init__(self, id, name, widthCount, offset=None, clipped=None):
+		super(ImageBundle, self).__init__(id, name, offset, clipped)
 		self.images = []
-		self.widthCount = 1
+		self.widthCount = widthCount
 	
 	@classmethod
 	def read(cls, file):
 		self = super().read(file)
 		self.widthCount = struct.unpack("<I", file.read(4))[0]
+		self.images = []
+		
 		numImages = struct.unpack("<I", file.read(4))[0]
 		for i in range(numImages):
 			self.images.append(Image(file=file))
@@ -255,14 +277,16 @@ class Animation:
 	
 	Most sprites have a single, static animation with one frame.
 	"""
-	def __init__(self):
-		self.name = ""
+	def __init__(self, name):
+		self.name = name
 		self.keyframes = []
 	
 	@classmethod
 	def read(cls, file):
-		self = cls()
+		self = cls.__new__(cls)
 		self.name = readStr(file)
+		self.keyframes = []
+		
 		numKeyframes = struct.unpack("<i", file.read(4))[0]
 		for i in range(numKeyframes):
 			imageId = struct.unpack("<i", file.read(4))[0]
