@@ -18,6 +18,10 @@ def register(cls):
 	commands[cmd.name] = cmd
 	return cls
 
+def exitError(*args):
+	print(*args, file=sys.stderr)
+	sys.exit(1)
+
 # #################################################################
 
 @register
@@ -71,8 +75,7 @@ class ShowTexCommand(BaseCommand):
 			package = SpritePackage.read(args.file)
 		
 		if args.texid < 0 or args.texid >= len(package.textures):
-			print("Bad texture id", file=sys.stderr)
-			sys.exit(1)
+			exitError("Bad texture ID:", str(args.texid), "/", len(package.textures))
 		
 		package.textures[args.texid].contents.show()
 
@@ -91,8 +94,7 @@ class ExtractTexCommand(BaseCommand):
 		with args.file:
 			package = SpritePackage.read(args.file)
 		if args.texid < 0 or args.texid >= len(package.textures):
-			print("Bad texture id", file=sys.stderr)
-			sys.exit(1)
+			exitError("Bad texture ID:", str(args.texid), "/", len(package.textures))
 		
 		package.textures[args.texid].contents.save(args.out)
 
@@ -110,8 +112,7 @@ class ShowAnimCommand(BaseCommand):
 		with args.file:
 			package = SpritePackage.read(args.file)
 		if args.anim not in package.anims:
-			print("Bad anim:", args.anim, file=sys.stderr)
-			sys.exit(1)
+			exitError("Bad anim:", args.anim)
 		
 		anim = package.anims[args.anim]
 		
@@ -139,8 +140,7 @@ class SSPackCommand(BaseCommand):
 		pilimg = PILImage.open(args.txfile)
 		
 		if pilimg.size[0] != pilimg.size[1] or ((pilimg.size[0] & (pilimg.size[0]-1)) != 0):
-			print("Image must be square with powers of two dimensions", file=sys.stderr)
-			sys.exit(1)
+			exitError("Image must be square with powers of two dimensions")
 		
 		package.textureSize = pilimg.size[0]
 		
@@ -153,8 +153,7 @@ class SSPackCommand(BaseCommand):
 		elif pilimg.mode == "L":
 			package.textureFormat = TEXTURE_FORMAT_A
 		else:
-			print("Incompatible image mode: "+img.mode, file=sys.stderr)
-			sys.exit(1)
+			exitError("Incompatible image mode:", img.mode)
 		
 		package.textures.append(tex)
 		
@@ -165,8 +164,7 @@ class SSPackCommand(BaseCommand):
 				
 				match = linere.match(line)
 				if not match:
-					print("Bad input line: '{0}'".format(line), file=sys.stderr)
-					sys.exit(1)
+					exitError("Bad input line: '{0}'".format(line))
 				
 				name, x, y, w, h = match.groups()
 				x, y, w, h = int(x), int(y), int(w), int(h)
