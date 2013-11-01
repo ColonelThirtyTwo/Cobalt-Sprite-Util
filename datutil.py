@@ -6,6 +6,9 @@ from collections import namedtuple
 from PIL import Image as PILImage
 
 def readStr(file):
+	"""
+	Reads a null terminated ASCII string from a binary file.
+	"""
 	l = []
 	c = file.read(1)
 	while c != b'\x00':
@@ -22,9 +25,22 @@ BASE_ID_IMAGES = 0
 BASE_ID_BUNDLES = 100000
 
 class BadFileFormatError(Exception):
+	"""
+	Exception thrown when the input file is not a valid sprite package.
+	"""
 	pass
 
 class SpritePackage:
+	"""
+	Represents a sprite package in memory, and provides facilities for
+	reading/writing them.
+	
+	A sprite package contains
+	* textures, which are spri,
+	* images, which are sections of a texture corresponding to individual sprites,
+	* image bundles, which are collections of images, and
+	* animations
+	"""
 	def __init__(self, file=None):
 		self.version = 3
 		self.textureSize = 0
@@ -81,6 +97,14 @@ class SpritePackage:
 			i.write(file)
 
 class Texture:
+	"""
+	Spritesheet image.
+	
+	Textures must be square and have powers-of-two dimensions.
+	Every texture in a sprite package must have the same size and format.
+	
+	Textures can be RGB, RGBA, A, or "Special AI" (not supported yet)
+	"""
 	def __init__(self, id, file=None, size=None, format=None):
 		self.id = id
 		self.isSpecialAI = False
@@ -123,6 +147,9 @@ class Texture:
 				file.write(struct.pack("B", px))
 
 class ImageBase:
+	"""
+	Base class for images. Do not use this directly!
+	"""
 	def __init__(self, file=None):
 		self.name = ""
 		self.id = 0
@@ -151,6 +178,9 @@ class ImageBase:
 		file.write(struct.pack("<I", self.clipped[1]))
 
 class Image(ImageBase):
+	"""
+	Defines a single sprite in a textures.
+	"""
 	def __init__(self, file=None):
 		super(Image, self).__init__(file=file)
 		self.textureNum = 0
@@ -179,6 +209,10 @@ class Image(ImageBase):
 			file.write(struct.pack("<I", n))
 
 class ImageBundle(ImageBase):
+	"""
+	Defines a collection of images.
+	This doesn't seem to be used much, and has not been thoroughly tested.
+	"""
 	def __init__(self, file=None):
 		super(ImageBundle, self).__init__(file=file)
 		self.images = []
@@ -198,6 +232,9 @@ class ImageBundle(ImageBase):
 			i.write(file)
 
 class Keyframe:
+	"""
+	A single frame of animation.
+	"""
 	def __init__(self, imageId, step, delay):
 		self.imageId = imageId
 		self.step = step
@@ -206,8 +243,12 @@ class Keyframe:
 	def __str__(self):
 		return "(Image: {0}, Step: {1}, Delay: {2})".format(self.imageId, self.step, self.delay)
 
-class Animation():
+class Animation:
+	"""
+	Defines an animation.
 	
+	Most sprites have a single, static animation with one frame.
+	"""
 	def __init__(self, file=None):
 		self.name = ""
 		self.keyframes = []
@@ -235,6 +276,8 @@ class Animation():
 			file.write(struct.pack("<i", i.step))
 		for i in self.keyframes:
 			file.write(struct.pack("<i", i.delay))
+
+# ########################################################################
 
 def cmd_list(args):
 	package = SpritePackage(file=args.file)
@@ -348,6 +391,8 @@ def cmd_sspack(args):
 	
 	with args.out:
 		package.write(args.out)	
+
+# ########################################################################
 
 if __name__ == "__main__":
 	import argparse
